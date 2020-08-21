@@ -1,4 +1,6 @@
+#if defined (RELEASE)
 #include <mini_crt.hpp>
+#endif
 
 #include "patternfind.h"
 
