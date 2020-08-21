@@ -4,7 +4,7 @@ IDA plugin to patch IDA in memory.
 
 ## Usage
 
-1. Copy `idapatch.plw`, `idapatch.p64` and `idapatch.ini` to your IDA `plugins` directory.
+1. Copy `idapatch.dll`, `idapatch64.dll` and `idapatch.ini` to your IDA `plugins` directory.
 2. Use [DebugView](https://technet.microsoft.com/en-us/sysinternals/debugview.aspx) to see status.
 
 ## Configuration
