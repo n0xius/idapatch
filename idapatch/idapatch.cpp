@@ -1,41 +1,32 @@
-#include <windows.h>
-#include <stdio.h>
-#include <psapi.h>
+#include <mini_crt.hpp>
+
+#include <Windows.h>
+#include <Psapi.h>
+#include <cstdio>
+
 #include "Utf8Ini.h"
 #include "patternfind.h"
 
-#define IDP_INTERFACE_VERSION 76
-#define PLUGIN_HIDE 0x10
-#define idaapi __stdcall
-#define PLUGIN_KEEP 2
+#include <ida.hpp>
+#include <idp.hpp>
+#include <loader.hpp>
 
-class plugin_t
-{
-public:
-    int version;
-    int flags;
-    int (idaapi* init)(void);
-    void (idaapi* term)(void);
-    void (idaapi* run)(int arg);
-    const char* comment;
-    const char* help;
-    const char* wanted_name;
-    const char* wanted_hotkey;
-};
+#pragma comment(lib, "../idasdk70/lib/x64_win_vc_64/ida.lib")
 
-static int idaapi IDAP_init(void)
+int idaapi IDAP_init(void)
 {
     return PLUGIN_KEEP;
 }
 
-static void idaapi IDAP_run(int arg)
+bool idaapi IDAP_run(size_t arg)
 {
+    return true;
 }
 
-extern "C" __declspec(dllexport) plugin_t PLUGIN =
+plugin_t PLUGIN =
 {
     IDP_INTERFACE_VERSION,
-    PLUGIN_HIDE,
+    PLUGIN_FIX | PLUGIN_HIDE,
     IDAP_init,
     nullptr,
     IDAP_run,
@@ -60,7 +51,7 @@ static void dprintf(const char* format, ...)
     va_list args;
     va_start(args, format);
     *dprintf_msg = 0;
-    vsnprintf_s(dprintf_msg, sizeof(dprintf_msg), format, args);
+    vsnprintf(dprintf_msg, sizeof(dprintf_msg), format, args);
 #ifdef DEBUG
     static auto hasConsole = false;
     if(!hasConsole)
@@ -86,9 +77,11 @@ static void idapatch(const wchar_t* patchIni)
 
     Utf8Ini ini;
     auto hFile = CreateFileW(patchIni, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+
     if(hFile != INVALID_HANDLE_VALUE)
     {
         auto fileSize = GetFileSize(hFile, nullptr);
+
         if(fileSize)
         {
             auto iniData = new char[fileSize + 1];
@@ -109,6 +102,7 @@ static void idapatch(const wchar_t* patchIni)
         }
         else
             dputs("GetFileSize failed...");
+
         CloseHandle(hFile);
     }
     else
@@ -117,6 +111,7 @@ static void idapatch(const wchar_t* patchIni)
     std::vector<Patch> patches;
     auto sections = ini.Sections();
     patches.reserve(sections.size());
+
     for(const auto & section : sections)
     {
         Patch patch;
@@ -125,19 +120,23 @@ static void idapatch(const wchar_t* patchIni)
         patch.replace = ini.GetValue(section, "replace");
         auto enabled = ini.GetValue(section, "enabled");
         patch.module = ini.GetValue(section, "module");
+
         if(!patch.module.length())
             patch.module = "wll";
-        if(enabled == "0")
+
+        if(std::strtoul(enabled.data(), nullptr, 10) == 0)
         {
-            dprintf("%s disabled...\n", patch.name.c_str());
+            dprintf("%s disabled...\n", patch.name.data());
             continue;
         }
+
         if(!patterntransform(searchData, patch.search) || !patterntransform(patch.replace, patch.replaceTr))
         {
-            dprintf("Invalid data in %s...\n", section.c_str());
+            dprintf("Invalid data in %s...\n", section.data());
             continue;
         }
-        dprintf("%s loaded!\n", patch.name.c_str());
+
+        dprintf("%s loaded!\n", patch.name.data());
         patches.push_back(patch);
     }
 
@@ -145,48 +144,58 @@ static void idapatch(const wchar_t* patchIni)
     for(const auto & patch : patches)
     {
         HMODULE hModule;
-        if(patch.module == "wll")
+        if(patch.module == "dll")
         {
-            hModule = GetModuleHandleA("ida.wll");
+            hModule = GetModuleHandleA("ida.dll");
+
             if(!hModule)
-                hModule = GetModuleHandleA("ida64.wll");
+                hModule = GetModuleHandleA("ida64.dll");
         }
         else if(patch.module == "exe")
         {
-            hModule = GetModuleHandleA("idaq.exe");
+            hModule = GetModuleHandleA("ida.exe");
+
             if(!hModule)
-                hModule = GetModuleHandleA("idaq64.exe");
+                hModule = GetModuleHandleA("ida64.exe");
         }
         else
-            hModule = GetModuleHandleA(patch.module.c_str());
+            hModule = GetModuleHandleA(patch.module.data());
+
         if(!hModule)
         {
-            dprintf("Failed to find module %s for patch %s...\n", patch.module.c_str(), patch.name.c_str());
+            dprintf("Failed to find module %s for patch %s...\n", patch.module.data(), patch.name.data());
             continue;
         }
+
         MODULEINFO modinfo;
         if(!GetModuleInformation(GetCurrentProcess(), hModule, &modinfo, sizeof(modinfo)))
         {
-            dprintf("GetModuleInformation failed for module %s (%p)...\n", patch.module.c_str(), hModule);
+            dprintf("GetModuleInformation failed for module %s (%p)...\n", patch.module.data(), hModule);
             continue;
         }
+
         auto data = (unsigned char*)modinfo.lpBaseOfDll;
         auto datasize = size_t(modinfo.SizeOfImage);
         auto found = patternfind(data, datasize, patch.search);
+
         if(found == -1)
         {
-            dprintf("Failed to find pattern for %s...\n", patch.name.c_str());
+            dprintf("Failed to find pattern for %s...\n", patch.name.data());
             continue;
         }
+
         auto buffersize = patch.replaceTr.size();
         auto buffer = new unsigned char[buffersize];
+
         memcpy(buffer, data + found, buffersize);
-        patternwrite(buffer, buffersize, patch.replace.c_str());
+        patternwrite(buffer, buffersize, patch.replace.data());
+
         SIZE_T written;
         if(WriteProcessMemory(GetCurrentProcess(), data + found, buffer, buffersize, &written))
             patched++;
         else
             dprintf("WriteProcessMemory failed...");
+
         delete[] buffer;
     }
 
@@ -204,14 +213,14 @@ BOOL WINAPI DllMain(
     if(fdwReason == DLL_PROCESS_ATTACH)
     {
         char mutexName[32] = "";
-        sprintf_s(mutexName, "idapatch%X", GetCurrentProcessId());
+        sprintf(mutexName, "idapatch%X", GetCurrentProcessId());
         if(CreateMutexA(nullptr, FALSE, mutexName) && GetLastError() != ERROR_ALREADY_EXISTS)
         {
             wchar_t patchIni[MAX_PATH] = L"";
             if(GetModuleFileNameW(hinstDLL, patchIni, _countof(patchIni)))
             {
                 *wcsrchr(patchIni, L'\\') = L'\0';
-                wcscat_s(patchIni, L"\\idapatch.ini");
+                wcscat(patchIni, L"\\idapatch.ini");
                 idapatch(patchIni);
             }
 

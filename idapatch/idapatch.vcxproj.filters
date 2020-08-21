@@ -21,12 +21,18 @@
     <ClCompile Include="patternfind.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\mini_crt\mini_crt.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="patternfind.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Utf8Ini.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\mini_crt\mini_crt.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

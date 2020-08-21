@@ -1,6 +1,7 @@
 #ifndef _PATTERNFIND_H
 #define _PATTERNFIND_H
 
+#include <string>
 #include <vector>
 
 struct PatternByte

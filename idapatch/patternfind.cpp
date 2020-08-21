@@ -1,5 +1,6 @@
+#include <mini_crt.hpp>
+
 #include "patternfind.h"
-#include <vector>
 
 using namespace std;
 
