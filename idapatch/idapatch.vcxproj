@@ -67,8 +67,8 @@
       <AdditionalOptions>/nocoffgrpinfo %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>copy $(OutDir)\idapatch.dll $(OutDir)\idapatch64.dll
+copy $(ProjectDir)\idapatch.ini $(OutDir)\idapatch.ini</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
